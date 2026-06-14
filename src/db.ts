@@ -85,7 +85,8 @@ export async function initDb(
 
   console.log(`[db] Fetched ${(buf.byteLength / 1024).toFixed(1)} KB`);
   onProgress?.("Opening database…");
-  _db = new SQL.Database(buf);
+  // sql.js requires Uint8Array — passing a raw ArrayBuffer silently produces an empty DB
+  _db = new SQL.Database(new Uint8Array(buf));
 
   // Smoke-test: verify expected tables exist
   const result = _db.exec(
