@@ -193,6 +193,16 @@ export function renderMap(
     .on("zoom", (ev) => {
       gMap.attr("transform", ev.transform);
       gArcs.attr("transform", ev.transform);
+      // Scale arc strokes inversely so they appear visually constant
+      gArcs.selectAll<SVGPathElement, unknown>(".m-arc").each(function () {
+        const el = d3.select(this);
+        el.attr("stroke-width", +el.attr("data-base-w") / Math.sqrt(ev.transform.k));
+      });
+      // Scale marker heads inversely with zoom so arrows stay proportional
+      edgeTypes.forEach((t) => {
+        const ms = 5 / Math.sqrt(ev.transform.k);
+        svg.select("#marr-" + t).attr("markerWidth", ms).attr("markerHeight", ms);
+      });
       repositionNodes(ev.transform.k, ev.transform.x, ev.transform.y);
     });
   svg.call(zoom);
@@ -344,26 +354,9 @@ export function renderMap(
   repositionNodes(1, 0, 0);
 
   // ── Reposition helper (keeps nodes at constant screen size on zoom)
+  // Arcs live inside the transformed gArcs group and use raw projection coords,
+  // so we only need to reposition the nodes (which are outside that group).
   function repositionNodes(k: number, tx: number, ty: number): void {
-    // Recompute arc paths with current transform
-    gArcs.selectAll<SVGPathElement, unknown>(".m-arc").each(function () {
-      const el = d3.select(this);
-      const slon = +el.attr("data-src-lon"), slat = +el.attr("data-src-lat");
-      const tlon = +el.attr("data-tgt-lon"), tlat = +el.attr("data-tgt-lat");
-      const sr = +el.attr("data-src-r"), tr = +el.attr("data-tgt-r");
-
-      const [sx, sy] = proj([slon, slat]) ?? [0, 0];
-      const [txp, typ] = proj([tlon, tlat]) ?? [0, 0];
-      const psx = sx * k + tx, psy = sy * k + ty;
-      const ptx = txp * k + tx, pty = typ * k + ty;
-      const pmx = (psx + ptx) / 2, pmy = (psy + pty) / 2;
-      const [asx, asy] = arcStartShortened(psx, psy, pmx, pmy, ptx, pty, sr);
-      const [atx, aty] = arcEndShortened(psx, psy, pmx, pmy, ptx, pty, tr);
-      el.attr("d", buildArcPath(asx, asy, atx, aty, routeStyle));
-      el.attr("stroke-width", +el.attr("data-base-w") / Math.sqrt(k));
-    });
-
-    // Reposition nodes at constant screen size
     gNodes.selectAll<SVGGElement, unknown>(".m-node-g").each(function () {
       const el = d3.select(this);
       const lon = +el.attr("data-lon"), lat = +el.attr("data-lat");
