@@ -381,7 +381,7 @@ export function renderMap(
 
     // Shorten calculations derived directly from the curve's control trajectory tangents
     const [asx, asy] = arcStartShortened(sx, sy, cpx, cpy, srcR);
-    const [atx, aty] = arcEndShortened(cpx, cy, tx, ty, tgtR);
+    const [atx, aty] = arcEndShortened(cpx, cpy, tx, ty, tgtR);
 
     const arcColor = isCog ? edgeColors.cog : routeStyle.color;
     const arcDash = isCog ? "3 3" : routeStyle.strokeDash;
