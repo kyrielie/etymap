@@ -1,6 +1,7 @@
 import type { WordDetail, GraphNode } from "./types";
 import { getLang } from "./db";
 import { routeToFamilyLabel } from "./routes";
+import { EDGE_LABELS } from "./graph";
 
 // ── Panel update ──────────────────────────────────────────────────────────────
 
@@ -47,7 +48,8 @@ export function updatePanel(data: WordDetail): void {
       if (n.etym_text) {
         const etym = document.createElement("p");
         etym.className = "panel-node-etym";
-        etym.textContent = n.etym_text.slice(0, 200) + (n.etym_text.length > 200 ? "…" : "");
+        // Let CSS line-clamp handle truncation — no JS slice needed
+        etym.textContent = n.etym_text;
         li.appendChild(etym);
       }
 
@@ -79,15 +81,10 @@ function updateEdgeCounts(data: WordDetail): void {
   if (!container) return;
   container.innerHTML = "";
 
-  const labels: Record<string, string> = {
-    inh: "Inherited", bor: "Borrowed", der: "Derived",
-    lbor: "Learned borrowing", dbl: "Doublet", affix: "Affix",
-  };
-
   Object.entries(counts).forEach(([type, count]) => {
     const span = document.createElement("span");
     span.className = "edge-count-pill edge-" + type;
-    span.textContent = `${labels[type] ?? type} ×${count}`;
+    span.textContent = `${EDGE_LABELS[type] ?? type} ×${count}`;
     container.appendChild(span);
   });
 

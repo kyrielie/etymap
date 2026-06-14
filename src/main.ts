@@ -2,18 +2,17 @@ import { initDb, getWordsByCategory, loadWordDetail, findWordId } from "./db";
 import { buildWordSelector, selectByConceptString, getHashConcept } from "./wordSelector";
 import { renderGraph, graphZoom, graphReset } from "./graph";
 import { renderMap, mapZoom, mapReset, loadWorldTopo } from "./map";
+import { renderTree, treeZoom, treeReset } from "./tree";
 import { updatePanel, selectPanelNode, showLoading, hideLoading, showError, hideError } from "./panel";
 
 // ── App state ─────────────────────────────────────────────────────────────────
 
-type View = "graph" | "map";
+type View = "graph" | "map" | "tree";
 let _currentView: View = "graph";
 let _currentWordId: number | null = null;
 let _filters = new Set<string>(["inh", "bor", "der", "lbor"]);
 
 // ── DB paths ──────────────────────────────────────────────────────────────────
-// Use a document-relative URL so this works in dev (served from /) and on
-// GitHub Pages where the site lives at /<reponame>/.
 const DB_URL = new URL("db/etymap.db", document.baseURI).href;
 const WASM_URL = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.wasm";
 
@@ -32,13 +31,11 @@ async function boot(): Promise<void> {
     return;
   }
 
-  // Populate word selector
   const grouped = getWordsByCategory();
   buildWordSelector(grouped, handleWordSelect);
 
   hideLoading();
 
-  // Restore from URL hash, or show prompt
   const hash = getHashConcept();
   if (hash) {
     const id = findWordId(hash);
@@ -72,13 +69,11 @@ function renderCurrentView(): void {
   const data = loadWordDetail(_currentWordId);
 
   if (_currentView === "graph") {
-    renderGraph(data, _filters, (nodeId) => {
-      selectPanelNode(nodeId);
-    });
+    renderGraph(data, _filters, (nodeId) => selectPanelNode(nodeId));
+  } else if (_currentView === "map") {
+    renderMap(data, _filters, (nodeId) => selectPanelNode(nodeId));
   } else {
-    renderMap(data, _filters, (nodeId) => {
-      selectPanelNode(nodeId);
-    });
+    renderTree(data, _filters, (nodeId) => selectPanelNode(nodeId));
   }
 }
 
@@ -88,7 +83,15 @@ function switchView(view: View): void {
   _currentView = view;
 
   document.getElementById("graph-stage")!.hidden = view !== "graph";
-  document.getElementById("map-stage")!.hidden = view !== "map";
+  document.getElementById("map-stage")!.hidden   = view !== "map";
+  document.getElementById("tree-stage")!.hidden  = view !== "tree";
+
+  // In tree view, COG filter has no meaning — disable its button visually
+  const cogLabel = document.querySelector<HTMLElement>('.fc[data-t="cog"]');
+  if (cogLabel) {
+    cogLabel.style.pointerEvents = view === "tree" ? "none" : "";
+    cogLabel.style.opacity       = view === "tree" ? "0.2" : "";
+  }
 
   document.querySelectorAll<HTMLButtonElement>(".view-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.view === view);
@@ -120,15 +123,18 @@ function setupFilters(): void {
 function setupZoom(): void {
   document.getElementById("btn-zoom-in")?.addEventListener("click", () => {
     if (_currentView === "graph") graphZoom(1.35);
-    else mapZoom(1.35);
+    else if (_currentView === "map") mapZoom(1.35);
+    else treeZoom(1.35);
   });
   document.getElementById("btn-zoom-out")?.addEventListener("click", () => {
     if (_currentView === "graph") graphZoom(1 / 1.35);
-    else mapZoom(1 / 1.35);
+    else if (_currentView === "map") mapZoom(1 / 1.35);
+    else treeZoom(1 / 1.35);
   });
   document.getElementById("btn-zoom-reset")?.addEventListener("click", () => {
     if (_currentView === "graph") graphReset();
-    else mapReset();
+    else if (_currentView === "map") mapReset();
+    else treeReset();
   });
 }
 

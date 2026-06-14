@@ -12,10 +12,6 @@
   <!-- CDN dependencies (loaded before our bundle) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
-  <!--
-    sql.js: WASM is loaded at runtime via initSqlJs({ locateFile }) in db.ts.
-    The JS bootstrap is fetched from CDN here so initSqlJs() is available globally.
-  -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
 
   <link rel="stylesheet" href="style.css">
@@ -32,7 +28,6 @@
 
     <!-- Word selector: populated by wordSelector.ts -->
     <div class="hd-selector" id="word-selector-container">
-      <!-- #word-search and #word-select are injected here by wordSelector.ts -->
       <span style="font-family:'EB Garamond',serif;font-style:italic;color:rgba(239,230,210,.3);font-size:13px;">
         Loading…
       </span>
@@ -40,7 +35,8 @@
 
     <div class="hd-views">
       <button class="view-btn active" data-view="graph">Graph</button>
-      <button class="view-btn" data-view="map">Map</button>
+      <button class="view-btn"        data-view="map">Map</button>
+      <button class="view-btn"        data-view="tree">Tree</button>
     </div>
   </header>
 
@@ -48,17 +44,17 @@
   <div class="stage">
     <div class="canvas">
 
-      <!-- Shared filter bar and zoom controls (persist across view switches) -->
+      <!-- Shared filter bar and zoom controls -->
       <div class="filter-bar">
-        <label class="fc" data-t="inh"><input class="filter-cb" type="checkbox" data-type="inh" hidden> INH</label>
-        <label class="fc" data-t="bor"><input class="filter-cb" type="checkbox" data-type="bor" hidden> BOR</label>
-        <label class="fc" data-t="der"><input class="filter-cb" type="checkbox" data-type="der" hidden> DER</label>
-        <label class="fc" data-t="lbor"><input class="filter-cb" type="checkbox" data-type="lbor" hidden> LBOR</label>
-        <label class="fc" data-t="cog"><input class="filter-cb" type="checkbox" data-type="cog" hidden> COG</label>
+        <label class="fc" data-t="inh"><input  class="filter-cb" type="checkbox" data-type="inh"  hidden> Inherited</label>
+        <label class="fc" data-t="bor"><input  class="filter-cb" type="checkbox" data-type="bor"  hidden> Borrowed</label>
+        <label class="fc" data-t="der"><input  class="filter-cb" type="checkbox" data-type="der"  hidden> Derived</label>
+        <label class="fc" data-t="lbor"><input class="filter-cb" type="checkbox" data-type="lbor" hidden> Learned borrow</label>
+        <label class="fc" data-t="cog"><input  class="filter-cb" type="checkbox" data-type="cog"  hidden> Cognate</label>
       </div>
       <div class="cv-ctrl">
-        <button class="ctrl-btn" id="btn-zoom-in"  title="Zoom in">+</button>
-        <button class="ctrl-btn" id="btn-zoom-out" title="Zoom out">−</button>
+        <button class="ctrl-btn" id="btn-zoom-in"    title="Zoom in">+</button>
+        <button class="ctrl-btn" id="btn-zoom-out"   title="Zoom out">−</button>
         <button class="ctrl-btn" id="btn-zoom-reset" title="Reset zoom" style="font-size:11px;">↺</button>
       </div>
 
@@ -72,18 +68,21 @@
         <svg id="map-svg"></svg>
       </div>
 
+      <!-- Tree view -->
+      <div id="tree-stage" hidden>
+        <svg id="tree-svg"></svg>
+      </div>
+
     </div><!-- /.canvas -->
 
     <!-- ── Side panel ────────────────────────────────────────────────────── -->
     <aside class="panel">
 
-      <!-- Loading / error banners (shown/hidden by panel.ts) -->
       <div id="panel-loading" style="padding:20px 17px;font-family:'EB Garamond',serif;font-style:italic;color:var(--ink3);">
         Initialising…
       </div>
       <div id="panel-error" hidden style="color:var(--red);padding:10px 17px;font-size:11px;"></div>
 
-      <!-- Main content (hidden until a word is loaded) -->
       <div id="panel-content" hidden>
         <div class="p-head">
           <div class="p-word" id="panel-concept">—</div>
@@ -91,6 +90,7 @@
           <span class="origin-badge" id="panel-origin-badge" hidden></span>
         </div>
 
+        <!-- Summary: no max-height/overflow — let the full text show -->
         <div class="p-summary" id="panel-summary"></div>
 
         <div class="p-scroll">
@@ -120,14 +120,13 @@
 
 </div><!-- /.app -->
 
-<!-- Tooltip (shared between graph and map) -->
+<!-- Tooltip (shared across all views) -->
 <div id="tip">
   <span class="tw" id="tt-w"></span>
   <span class="tl" id="tt-l"></span>
   <div class="tb" id="tt-b"></div>
 </div>
 
-<!-- App bundle (produced by bun.build.ts → dist/main.js) -->
 <script type="module" src="main.js"></script>
 </body>
 </html>

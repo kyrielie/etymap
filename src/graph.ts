@@ -13,6 +13,16 @@ const RC: Record<string, string> = {
   cog: "#8B7355",
 };
 
+export const EDGE_LABELS: Record<string, string> = {
+  inh: "Inherited",
+  bor: "Borrowed",
+  der: "Derived",
+  lbor: "Learned borrowing",
+  dbl: "Doublet",
+  affix: "Affix",
+  cog: "Cognate",
+};
+
 const FAM_COLOR: Record<string, string> = {
   Germanic: "#3D5F7A",
   "Proto-Germanic": "#2A4A5E",
@@ -87,6 +97,41 @@ function escHtml(s: string): string {
   return d.innerHTML;
 }
 
+// ── Ancestry pruning: keep only nodes/edges on a path TO English ──────────────
+
+export function pruneToAncestors(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  const enNode = nodes.find((n) => n.lang === "en");
+  if (!enNode) return { nodes, edges };
+
+  // Build parent map: for each node, which nodes point TO it (its ancestors)
+  const parents = new Map<string, string[]>();
+  for (const e of edges) {
+    if (!parents.has(e.tgt)) parents.set(e.tgt, []);
+    parents.get(e.tgt)!.push(e.src);
+  }
+
+  // BFS backwards from English node to collect all ancestor node IDs
+  const ancestorSet = new Set<string>();
+  const queue = [enNode.id];
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (ancestorSet.has(id)) continue;
+    ancestorSet.add(id);
+    for (const p of parents.get(id) ?? []) {
+      if (!ancestorSet.has(p)) queue.push(p);
+    }
+  }
+
+  const keptNodes = nodes.filter((n) => ancestorSet.has(n.id));
+  const keptEdges = edges.filter(
+    (e) => ancestorSet.has(e.src) && ancestorSet.has(e.tgt),
+  );
+  return { nodes: keptNodes, edges: keptEdges };
+}
+
 // ── Show/hide tip ─────────────────────────────────────────────────────────────
 
 function showTip(
@@ -155,7 +200,7 @@ export function renderGraph(
       .attr("stroke-linecap", "round");
   });
 
-  // ADD: Label halo filter so the text is legible over intersecting lines
+  // Label halo filter
   const filter = defs
     .append("filter")
     .attr("id", "lbl-halo")
@@ -209,8 +254,11 @@ export function renderGraph(
     return true;
   });
 
+  // Prune to ancestors-only subgraph
+  const pruned = pruneToAncestors(data.nodes, visEdges);
+
   // Cognate pseudo-edges
-  const activeIds = new Set(data.nodes.map((n) => n.id));
+  const activeIds = new Set(pruned.nodes.map((n) => n.id));
   const cogEdges: GraphEdge[] = filters.has("cog")
     ? data.cognates.slice(0, 30).flatMap((cog) => {
         if (!activeIds.has(cog.src)) return [];
@@ -218,9 +266,9 @@ export function renderGraph(
         const lang = getLang(langCode);
         if (!lang) return [];
         activeIds.add(cog.tgt);
-        if (!data.nodes.find((n) => n.id === cog.tgt)) {
+        if (!pruned.nodes.find((n) => n.id === cog.tgt)) {
           const word = cog.tgt.split(":").slice(1).join(":");
-          data.nodes.push({
+          pruned.nodes.push({
             id: cog.tgt,
             word,
             lang: langCode,
@@ -240,7 +288,7 @@ export function renderGraph(
       })
     : [];
 
-  const allEdges = [...visEdges, ...cogEdges];
+  const allEdges = [...pruned.edges, ...cogEdges];
 
   // D3 simulation nodes/links
   interface SimNode extends GraphNode {
@@ -249,7 +297,12 @@ export function renderGraph(
     fx?: number | null;
     fy?: number | null;
   }
-  const simNodes: SimNode[] = data.nodes.map((n) => ({ ...n }));
+  const simNodes: SimNode[] = pruned.nodes.map((n) => ({
+    ...n,
+    // Jitter starting positions to prevent overlap at identical coords
+    x: W / 2 + (Math.random() - 0.5) * 20,
+    y: H / 2 + (Math.random() - 0.5) * 20,
+  }));
   const nodeById = new Map(simNodes.map((n) => [n.id, n]));
 
   const simLinks = allEdges
@@ -274,7 +327,7 @@ export function renderGraph(
     )
     .force("charge", d3.forceManyBody().strength(-280))
     .force("center", d3.forceCenter(W / 2, H / 2))
-    .force("collide", d3.forceCollide(22));
+    .force("collide", d3.forceCollide(28));
 
   // Edges
   const edgeSel = g
@@ -296,7 +349,7 @@ export function renderGraph(
       showTip(ev, {
         word: `${src.word} → ${tgt.word}`,
         lang: `${getLang(src.lang).name} → ${getLang(tgt.lang).name}`,
-        etym_text: `${d.type}: ${d.expansion}`,
+        etym_text: `${EDGE_LABELS[d.type] ?? d.type}: ${d.expansion}`,
       });
     })
     .on("mouseout", hideTip);
@@ -369,25 +422,50 @@ export function renderGraph(
         .attr("font-style", proto ? "italic" : "normal")
         .attr("fill", "rgba(247,241,227,.92)")
         .attr("pointer-events", "none")
-        .text(() => (d.word.length > 6 ? d.word.slice(0, 5) + "…" : d.word));
+        .text(() => (d.word.length > 8 ? d.word.slice(0, 7) + "…" : d.word));
     }
 
-    // ADD: Language title positioned safely beneath the node circle
+    // Language label — full name, wrap proto-languages to two lines
     const langName = getLang(d.lang).name;
-    el.append("text")
-      .attr("class", "g-lbl")
-      .attr("text-anchor", "middle")
-      .attr("dy", r + 10)
-      .attr("font-family", "'IBM Plex Sans',sans-serif")
-      .attr("font-size", 8)
-      .attr("font-weight", "500")
-      .attr("letter-spacing", "0.03em")
-      .attr("fill", "var(--ink1)")
-      .attr("filter", "url(#lbl-halo)")
-      .attr("pointer-events", "none")
-      .text(() =>
-        langName.length > 14 ? langName.slice(0, 13) + "…" : langName,
-      );
+    const isLong = langName.length > 16;
+    const words = langName.split(" ");
+    // For long names, split at mid-point word boundary
+    if (isLong && words.length > 1) {
+      const mid = Math.ceil(words.length / 2);
+      const line1 = words.slice(0, mid).join(" ");
+      const line2 = words.slice(mid).join(" ");
+      const lbl = el.append("text")
+        .attr("class", "g-lbl")
+        .attr("text-anchor", "middle")
+        .attr("font-family", "'IBM Plex Sans',sans-serif")
+        .attr("font-size", 7.5)
+        .attr("font-weight", "500")
+        .attr("letter-spacing", "0.03em")
+        .attr("fill", "var(--ink1)")
+        .attr("filter", "url(#lbl-halo)")
+        .attr("pointer-events", "none");
+      lbl.append("tspan")
+        .attr("x", 0)
+        .attr("dy", r + 10)
+        .text(line1);
+      lbl.append("tspan")
+        .attr("x", 0)
+        .attr("dy", "1.1em")
+        .text(line2);
+    } else {
+      el.append("text")
+        .attr("class", "g-lbl")
+        .attr("text-anchor", "middle")
+        .attr("dy", r + 10)
+        .attr("font-family", "'IBM Plex Sans',sans-serif")
+        .attr("font-size", 7.5)
+        .attr("font-weight", "500")
+        .attr("letter-spacing", "0.03em")
+        .attr("fill", "var(--ink1)")
+        .attr("filter", "url(#lbl-halo)")
+        .attr("pointer-events", "none")
+        .text(langName);
+    }
   });
 
   // Tick
