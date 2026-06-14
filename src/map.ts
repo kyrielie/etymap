@@ -285,19 +285,10 @@ export function renderMap(
     .zoom<SVGSVGElement, unknown>()
     .scaleExtent([0.5, 8])
     .on("zoom", (ev) => {
-      // Linearly pass the transformations to the entire uniform world space container
+      // Linearly pass the transformations to the entire uniform world space container.
+      // We removed the arc-inverse-scaling here so that nodes, labels, and lines
+      // scale purely geographically, exactly mirroring the graph's native behavior.
       gZoomable.attr("transform", ev.transform);
-
-      // Inversely scale line weights so they maintain continuous visual weights across scales
-      gArcs.selectAll<SVGPathElement, unknown>(".m-arc").each(function () {
-        const el = d3.select(this);
-        el.attr(
-          "stroke-width",
-          +el.attr("data-base-w") / Math.sqrt(ev.transform.k),
-        );
-      });
-
-      // Inversely scale text nodes / node components if desired, otherwise standard native group scale applies cleanly now
     });
   svg.call(zoom);
   _zoomBehavior = zoom;
