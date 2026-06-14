@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Etymap — A Historical Atlas of Word Transmission</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Sans:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- CDN dependencies (loaded before our bundle) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+  <!--
+    sql.js: WASM is loaded at runtime via initSqlJs({ locateFile }) in db.ts.
+    The JS bootstrap is fetched from CDN here so initSqlJs() is available globally.
+  -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Header ──────────────────────────────────────────────────────────── -->
+  <header>
+    <div class="hd-brand">
+      <span class="hd-title">Ety<b>map</b></span>
+      <span class="hd-sub">A Historical Atlas of Word Transmission</span>
+    </div>
+
+    <!-- Word selector: populated by wordSelector.ts -->
+    <div class="hd-selector" id="word-selector-container">
+      <!-- #word-search and #word-select are injected here by wordSelector.ts -->
+      <span style="font-family:'EB Garamond',serif;font-style:italic;color:rgba(239,230,210,.3);font-size:13px;">
+        Loading…
+      </span>
+    </div>
+
+    <div class="hd-views">
+      <button class="view-btn active" data-view="graph">Graph</button>
+      <button class="view-btn" data-view="map">Map</button>
+    </div>
+  </header>
+
+  <!-- ── Stage ───────────────────────────────────────────────────────────── -->
+  <div class="stage">
+    <div class="canvas">
+
+      <!-- Shared filter bar and zoom controls (persist across view switches) -->
+      <div class="filter-bar">
+        <label class="fc" data-t="inh"><input class="filter-cb" type="checkbox" data-type="inh" hidden> INH</label>
+        <label class="fc" data-t="bor"><input class="filter-cb" type="checkbox" data-type="bor" hidden> BOR</label>
+        <label class="fc" data-t="der"><input class="filter-cb" type="checkbox" data-type="der" hidden> DER</label>
+        <label class="fc" data-t="lbor"><input class="filter-cb" type="checkbox" data-type="lbor" hidden> LBOR</label>
+        <label class="fc" data-t="cog"><input class="filter-cb" type="checkbox" data-type="cog" hidden> COG</label>
+      </div>
+      <div class="cv-ctrl">
+        <button class="ctrl-btn" id="btn-zoom-in"  title="Zoom in">+</button>
+        <button class="ctrl-btn" id="btn-zoom-out" title="Zoom out">−</button>
+        <button class="ctrl-btn" id="btn-zoom-reset" title="Reset zoom" style="font-size:11px;">↺</button>
+      </div>
+
+      <!-- Graph view -->
+      <div id="graph-stage">
+        <svg id="graph-svg"></svg>
+      </div>
+
+      <!-- Map view -->
+      <div id="map-stage" hidden>
+        <svg id="map-svg"></svg>
+      </div>
+
+    </div><!-- /.canvas -->
+
+    <!-- ── Side panel ────────────────────────────────────────────────────── -->
+    <aside class="panel">
+
+      <!-- Loading / error banners (shown/hidden by panel.ts) -->
+      <div id="panel-loading" style="padding:20px 17px;font-family:'EB Garamond',serif;font-style:italic;color:var(--ink3);">
+        Initialising…
+      </div>
+      <div id="panel-error" hidden style="color:var(--red);padding:10px 17px;font-size:11px;"></div>
+
+      <!-- Main content (hidden until a word is loaded) -->
+      <div id="panel-content" hidden>
+        <div class="p-head">
+          <div class="p-word" id="panel-concept">—</div>
+          <span id="panel-category"></span>
+          <span class="origin-badge" id="panel-origin-badge" hidden></span>
+        </div>
+
+        <div class="p-summary" id="panel-summary"></div>
+
+        <div class="p-scroll">
+          <div class="edge-counts" id="panel-edge-counts"></div>
+
+          <div class="sec-head">Etymological chain</div>
+          <ul class="panel-node-list" id="panel-nodes"></ul>
+        </div>
+
+        <div class="p-foot">
+          <div class="legend" id="legend">
+            <div class="leg-item"><div class="leg-sw" style="background:var(--c-inh)"></div> Inherited</div>
+            <div class="leg-item"><div class="leg-sw" style="background:var(--c-bor)"></div> Borrowed</div>
+            <div class="leg-item"><div class="leg-sw" style="background:var(--c-der)"></div> Derived</div>
+            <div class="leg-item"><div class="leg-sw dash" style="border-color:var(--c-lbor)"></div> Learned</div>
+            <div class="leg-item"><div class="leg-sw dash" style="border-color:var(--c-cog)"></div> Cognate</div>
+          </div>
+          <div class="attr">
+            Data: <a href="https://kaikki.org" target="_blank">Kaikki.org</a>
+            &middot; <a href="https://wiktionary.org" target="_blank">Wiktionary</a>
+          </div>
+        </div>
+      </div><!-- /#panel-content -->
+
+    </aside>
+  </div><!-- /.stage -->
+
+</div><!-- /.app -->
+
+<!-- Tooltip (shared between graph and map) -->
+<div id="tip">
+  <span class="tw" id="tt-w"></span>
+  <span class="tl" id="tt-l"></span>
+  <div class="tb" id="tt-b"></div>
+</div>
+
+<!-- App bundle (produced by bun.build.ts → dist/main.js) -->
+<script type="module" src="main.js"></script>
+</body>
+</html>

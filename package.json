@@ -1,0 +1,19 @@
+{
+  "name": "etymap",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun run bun.build.ts",
+    "dev": "bun run dev.ts"
+  },
+  "dependencies": {
+    "sql.js": "^1.10.3"
+  },
+  "devDependencies": {
+    "@types/sql.js": "^1.4.9",
+    "@types/d3": "^7.4.3",
+    "@types/topojson-client": "^3.1.4",
+    "typescript": "^5.4.5"
+  }
+}
