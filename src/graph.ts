@@ -309,6 +309,24 @@ export function renderGraph(
     .append("g")
     .attr("class", "g-node")
     .style("cursor", "pointer")
+    .call(
+      d3
+        .drag<SVGGElement, SimNode>()
+        .on("start", (ev, d) => {
+          if (!ev.active) _simulation!.alphaTarget(0.3).restart();
+          d.fx = d.x;
+          d.fy = d.y;
+        })
+        .on("drag", (ev, d) => {
+          d.fx = ev.x;
+          d.fy = ev.y;
+        })
+        .on("end", (ev, d) => {
+          if (!ev.active) _simulation!.alphaTarget(0);
+          d.fx = null;
+          d.fy = null;
+        }),
+    )
     .on("mouseover", (ev, d) =>
       showTip(ev, {
         word: d.word,
